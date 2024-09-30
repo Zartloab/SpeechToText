@@ -1,0 +1,77 @@
+import logging
+import azure.cognitiveservices.speech as speechsdk
+import json
+import azure.functions as func
+
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('HTTP trigger function processed a request.')
+
+    # Retrieve input and output language from query parameters or body
+    input_language = req.params.get('input_language')
+    output_language = req.params.get('output_language')
+    
+    if not input_language or not output_language:
+        try:
+            req_body = req.get_json()
+            input_language = req_body.get('input_language')
+            output_language = req_body.get('output_language')
+        except ValueError:
+            pass
+
+    if not input_language or not output_language:
+        return func.HttpResponse(
+            "Please pass both 'input_language' and 'output_language' parameters in the query string or request body.",
+            status_code=400
+        )
+
+    # Azure Speech SDK configuration with subscription key and region
+    speech_translation_config = speechsdk.translation.SpeechTranslationConfig(
+        subscription="YOUR_SUBSCRIPTION_KEY", 
+        region="YOUR_REGION"
+    )
+    
+    # Set the recognition language to the user-selected input language
+    speech_translation_config.speech_recognition_language = input_language  # Dynamic input
+    
+    # Set the target language dynamically based on user-selected output language
+    speech_translation_config.add_target_language(output_language)
+
+    # Use the default microphone for audio input
+    audio_config = speechsdk.audio.AudioConfig(use_default_microphone=True)
+    translation_recognizer = speechsdk.translation.TranslationRecognizer(
+        translation_config=speech_translation_config, 
+        audio_config=audio_config
+    )
+
+    logging.info("Speak into your microphone.")
+    
+    # Start the recognition process
+    translation_recognition_result = translation_recognizer.recognize_once_async().get()
+
+    # Process the result and handle the response
+    if translation_recognition_result.reason == speechsdk.ResultReason.TranslatedSpeech:
+        # If the speech was recognized and translated, return the result
+        return func.HttpResponse(
+            json.dumps({
+                "recognized": translation_recognition_result.text,
+                "translation": translation_recognition_result.translations[output_language]
+            }),
+            mimetype="application/json"
+        )
+    elif translation_recognition_result.reason == speechsdk.ResultReason.NoMatch:
+        # If no speech was recognized
+        logging.error("No speech could be recognized.")
+        return func.HttpResponse(
+            "No speech could be recognized.", 
+            status_code=400
+        )
+    elif translation_recognition_result.reason == speechsdk.ResultReason.Canceled:
+        # If the recognition was canceled due to an error
+        cancellation_details = translation_recognition_result.cancellation_details
+        logging.error(f"Speech Recognition canceled: {cancellation_details.reason}")
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+            logging.error(f"Error details: {cancellation_details.error_details}")
+        return func.HttpResponse(
+            f"Speech Recognition canceled: {cancellation_details.reason}",
+            status_code=500
+        )

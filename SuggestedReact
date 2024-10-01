@@ -1,0 +1,53 @@
+import React, { useState } from "react";
+import axios from "axios";
+
+const SpeechToTextComponent = () => {
+  const [translation, setTranslation] = useState("");
+  const [inputLanguage, setInputLanguage] = useState("en-US"); // Default to English
+  const [outputLanguage, setOutputLanguage] = useState("zh-Hans"); // Default to Mandarin
+
+  const handleTranslate = async () => {
+    try {
+      const response = await axios.get("YOUR_AZURE_FUNCTION_URL", {
+        params: {
+          input_language: inputLanguage,
+          output_language: outputLanguage,
+        }
+      });
+      setTranslation(response.data.translation);
+    } catch (error) {
+      console.error("Error in translation: ", error);
+    }
+  };
+
+  return (
+    <div>
+      <label>Choose Input Language:</label>
+      <select onChange={(e) => setInputLanguage(e.target.value)} value={inputLanguage}>
+        <option value="en-US">English</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="zh-Hans">Mandarin (Simplified)</option>
+        <option value="ja">Japanese</option>
+        {/* Add more languages as needed */}
+      </select>
+
+      <label>Choose Output Language:</label>
+      <select onChange={(e) => setOutputLanguage(e.target.value)} value={outputLanguage}>
+        <option value="zh-Hans">Mandarin (Simplified)</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="ja">Japanese</option>
+        {/* Add more languages as needed */}
+      </select>
+
+      <button onClick={handleTranslate}>Translate Speech</button>
+
+      {translation && <p>Translation: {translation}</p>}
+    </div>
+  );
+};
+
+export default SpeechToTextComponent;
